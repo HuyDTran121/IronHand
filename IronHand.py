@@ -3,20 +3,28 @@ import cv2
 import pyautogui as gui
 import time
 import math
+
 gui.FAILSAFE = False;
 
-
-#Important globals
+# Important globals
 numFing = 0
-#constant
-xleft = 330
-xright = 0
-ytop = 220
-ybot = 0
-#prior bounds
-lowerBound = np.array([80, 50, 50]) #before 60,100,100
-upperBound = np.array([120, 255, 255]) #before 180, 255, 255
-#new bounds
+pos = tuple([0,0])
+detect = False
+# constant
+sizeThreshold = 8000
+screenWidth = int(960/2)
+screenHeight = int(540/2)
+bound = 4
+xBoundLow = int(screenWidth/bound)
+yBoundLow = int(screenHeight/bound)
+xBoundHigh = int((bound-1)*screenWidth/bound)
+yBoundHigh = int((bound-1)*screenHeight/bound)
+# movemenSmooth < 1
+movementSmooth = .1
+# prior bounds
+lowerBound = np.array([80, 50, 50])  # before 60,100,100
+upperBound = np.array([120, 255, 255])  # before 180, 255, 255
+# new bounds
 # lowerBound = np.array([200, 7, 209])
 # upperBound = np.array([230, 21, 235])
 blurValue = 41
@@ -29,8 +37,11 @@ clickReset = None;
 prevx = 0
 prevy = 0
 
-def calculateHighestPoint(res):
-    
+
+def calculateHighestPoint(maxCont):
+    extTop = tuple(maxCont[maxCont[:, :, 1].argmin()][0])
+    return extTop
+
 
 def calculateFingers(res, drawing):  # -> finished bool, cnt: finger count
     #  convexity defect
@@ -58,46 +69,48 @@ def calculateFingers(res, drawing):  # -> finished bool, cnt: finger count
 
 while webcam.isOpened():
     _, frame = webcam.read()
-    img = cv2.resize(frame, (330, 220))
-    #flip image
-    img = cv2.flip(img,1)
-    img = cv2.GaussianBlur(img,(blurValue,blurValue),0)
+    # flip image
+    frame = cv2.flip(frame, 1)
+    frame = cv2.resize(frame, (screenWidth, screenHeight))
+    img = cv2.GaussianBlur(frame, (blurValue, blurValue), 0)
     imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     # show frame
     cv2.imshow('Blur', imgHSV)
     mask = cv2.inRange(imgHSV, lowerBound, upperBound)
     maskOpen = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernelOpen)
     maskClose = cv2.morphologyEx(maskOpen, cv2.MORPH_CLOSE, kernelOpen)
-    #show frame
-    cv2.imshow('maskClose',maskClose)
-    # show frame
-    cv2.imshow('mask', mask)
-    # show frame
-    cv2.imshow('maskOpen', maskOpen)
     # show frame
     cv2.imshow('maskClose', maskClose)
+    # show frame
+    cv2.imshow('mask', mask)
     cv2.waitKey(1)
     k = cv2.waitKey(10)
     if k == 27:  # press ESC to exit
         break
-    _,conts,_ = cv2.findContours(maskOpen.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    maxx, maxy, maxh, maxw = [0,0,0,0];
-    ci=0
+    _, conts, _ = cv2.findContours(maskOpen.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    maxx, maxy, maxh, maxw = [0, 0, 0, 0];
+    ci = 0
     for i in range(len(conts)):
         x, y, w, h = cv2.boundingRect(conts[i])
         if h * w > maxh * maxw:
-            maxx = x; maxy = y; maxw = w; maxh = h;
+            maxx = x;
+            maxy = y;
+            maxw = w;
+            maxh = h;
             ci = i
-    if maxw * maxh > 25:
-        w,h = gui.size()
-        wr, hr = w/(xright-xleft), h/(ybot-ytop)
-        x1 = maxx+maxw/2
-        y1 = maxy+maxh/2
-        x = int(w-(x1-xleft)*wr)
-        y = int((y1-ytop)*hr)
+    #Area debug
+    print(maxw * maxh)
+    #If worthy size
+    if maxw * maxh > sizeThreshold:
+        # w, h = gui.size()
+        # wr, hr = w / (xBoundHigh - xBoundLow), h / (yBoundHigh - yBoundLow)
+        # x1 = maxx + maxw / 2
+        # y1 = maxy + maxh / 2
+        # x = int(w - (x1 - xBoundLow) * wr)
+        # y = int((y1 - yBoundLow) * hr)
+        detect = True
 
-    #Finger processing
-    try:
+    # Finger processing
         res = conts[ci]
         hull = cv2.convexHull(res)
         drawing = np.zeros(img.shape, np.uint8)
@@ -106,17 +119,19 @@ while webcam.isOpened():
 
         isFinishCal, cnt = calculateFingers(res, drawing)
         numFing = cnt + 1
+        pos = calculateHighestPoint(res)
         # Debug
-        print(numFing)
-    except:
-        fdsa =1
-
-
-    # Keyboard OP
-    k = cv2.waitKey(10)
-    if k == 27:  # press ESC to exit
-        break
-    #     gui.moveTo(x, y)
+        # print(pos)
+        cv2.circle(frame, pos, 5, (0, 0, 255), -1)
+        cv2.imshow('Point', frame)
+        cv2.waitKey(1)
+    else: detect = False
+    if detect:
+        scaleX = gui.size()[0]/(xBoundHigh-xBoundLow)
+        scaleY = gui.size()[1]/ (yBoundHigh - yBoundLow)
+        x = (pos[0]-xBoundLow)*scaleX
+        y = (pos[1]-yBoundLow)*scaleY
+        gui.moveTo(x, y, movementSmooth, gui.easeInQuad)
     #     if abs(x-prevx) < 10 and y-prevy < 10:
     #         if time.time() > clickTimer+0.5:
     #             gui.click(x, y)
@@ -127,4 +142,7 @@ while webcam.isOpened():
     #         clickTimer = time.time()
     # else:
     #     clickTimer = time.time()
-
+    #  Keyboard OP
+    k = cv2.waitKey(10)
+    if k == 27:  # press ESC to exit
+        break
