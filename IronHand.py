@@ -106,7 +106,7 @@ def calculateOneZero(res, drawing):  # -> finished bool, cnt: finger count
                 # Angle debug
                 # print(angle)
 
-                if 12.5/18*math.pi > angle >= 4/9*math.pi:  # angle less than 90 degree, treat as fingers
+                if 13/18*math.pi > angle >= 4/9*math.pi:  # angle less than 90 degree, treat as fingers
                     cnt = 1
                     cv2.circle(drawing, start, 5, (0, 0, 255), -1)
                     cv2.circle(drawing, end, 5, (0, 0, 255), -1)
