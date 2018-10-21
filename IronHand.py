@@ -4,6 +4,10 @@ import pyautogui as gui
 import time
 import math
 from threading import Thread
+import playsound
+
+import sys
+
 from audiotranscripter import AudioTranscripter
 import queue
 import winsound
@@ -36,7 +40,7 @@ inputQueue = queue.Queue(maxQueueSize)
 numFours = 0
 timeSinceFive = time.time() - 5
 timeSinceThree = time.time()
-at = None
+at = AudioTranscripter()
 recording = False;
 # constant
 threshold = 20
@@ -280,13 +284,13 @@ def loop():
             if numFours > maxQueueSize - 2 and not isRecording:
                 at.start()
                 isRecording = True
-                winsound.PlaySound('beep-01a.wav',winsound.SND_FILENAME)
+                playsound.playsound('C:\\Users\\huytr\\PycharmProjects\\IronHand\\beep-02.wav', True)
             if numFing == 0 and isRecording:
                 transcript=at.stop()
                 isRecording = False
-                winsound.PlaySound('beep-02.wav',winsound.SND_FILENAME)
+                playsound.playsound('C:\\Users\\huytr\\PycharmProjects\\IronHand\\s2.wav', True)
                 if transcript is not None:
-                    gui.typewrite(transcript)
+                    doCommand(transcript)
             print(numFing, pos, numFours)
             # Debug
             # print(pos)
@@ -343,7 +347,31 @@ def loop():
             scrollMode = False
             listenClick = False
 
-
+def doCommand(cmd):
+    cmds = cmd.split(" ")
+    if cmds[0] == '':
+        return
+    keyword = cmds[0].lower()
+    if keyword == "type":
+        for s in cmds[1:]:
+            gui.typewrite(s+" ")
+    elif keyword == "enter":
+        gui.press('enter')
+    elif keyword == "clear":
+        gui.keyDown('ctrl')
+        gui.press('a')
+        gui.keyUp('ctrl')
+        gui.press('backspace')
+    elif keyword == "back":
+        gui.press('browserback')
+    elif keyword == "close":
+        gui.keyDown('ctrl')
+        gui.press('w')
+        gui.keyUp('ctrl')
+    elif keyword == "search":
+        gui.press('browsersearch')
+    elif keyword == "terminate":
+        sys.exit()
 def removeBG(frame):
     fgmask = bgModel.apply(frame, learningRate=0)
     kernel = np.ones((3, 3), np.uint8)
