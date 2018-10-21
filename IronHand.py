@@ -80,15 +80,22 @@ oldX = 0
 oldY = 0
 numStill = 0
 
+
 def set_right(b):
     global rightHanded
     rightHanded = b
+
+
 def set_background(b):
     global backgroundVersion
     backgroundVersion = b
+
+
 def set_at(a):
     global at
     at = a
+
+
 def calculateHighestPoint(maxCont):
     extTop = tuple(maxCont[maxCont[:, :, 1].argmin()][0])
     return extTop
@@ -220,7 +227,8 @@ def loop():
         # TODO may mess up calculations
         frame = cv2.resize(frame, (screenWidth, screenHeight))
         if rightHanded:
-            cv2.rectangle(frame, (int(boxX * frame.shape[1]), 0),(frame.shape[1], int(boxY * frame.shape[0])), (255, 0, 0), 2)
+            cv2.rectangle(frame, (int(boxX * frame.shape[1]), 0), (frame.shape[1], int(boxY * frame.shape[0])),
+                          (255, 0, 0), 2)
         else:
             cv2.rectangle(frame, (0, 0), (int(boxX * frame.shape[1]), int(boxY * frame.shape[0])), (255, 0, 0), 2)
         cv2.imshow('original', frame)
@@ -284,14 +292,15 @@ def loop():
             if numFours > maxQueueSize - 2 and not isRecording:
                 at.start()
                 isRecording = True
-                playsound.playsound('C:\\Users\\huytr\\PycharmProjects\\IronHand\\beep-02.wav', True)
+                playsound.playsound('beep-02.wav', True)
             if numFing == 0 and isRecording:
-                transcript=at.stop()
+                transcript = at.stop()
+                print(transcript)
                 isRecording = False
-                playsound.playsound('C:\\Users\\huytr\\PycharmProjects\\IronHand\\s2.wav', True)
+                playsound.playsound('s2.wav', True)
                 if transcript is not None:
                     doCommand(transcript)
-            print(numFing, pos, numFours)
+            # print(numFing, pos, numFours)
             # Debug
             # print(pos)
             cv2.circle(frame, pos, 5, (0, 0, 255), -1)
@@ -347,6 +356,7 @@ def loop():
             scrollMode = False
             listenClick = False
 
+
 def doCommand(cmd):
     cmds = cmd.split(" ")
     if cmds[0] == '':
@@ -354,7 +364,7 @@ def doCommand(cmd):
     keyword = cmds[0].lower()
     if keyword == "type":
         for s in cmds[1:]:
-            gui.typewrite(s+" ")
+            gui.typewrite(s + " ")
     elif keyword == "enter":
         gui.press('enter')
     elif keyword == "clear":
@@ -364,20 +374,28 @@ def doCommand(cmd):
         gui.press('backspace')
     elif keyword == "back":
         gui.press('browserback')
+    elif keyword == "forward":
+        gui.press("browserforward")
     elif keyword == "close":
         gui.keyDown('ctrl')
         gui.press('w')
         gui.keyUp('ctrl')
+    elif keyword =="run":
+        gui.hotkey('win','s')
+        if len(cmds)>1:
+            gui.typewrite(cmds[1])
+            gui.press("enter")
     elif keyword == "search":
         gui.press('browsersearch')
-    elif keyword == "terminate":
+        for s in cmds[1:]:
+            gui.typewrite(s + " ")
+    elif keyword == "terminate" or keyword =="exit":
         sys.exit()
+
+
 def removeBG(frame):
     fgmask = bgModel.apply(frame, learningRate=0)
     kernel = np.ones((3, 3), np.uint8)
     fgmask = cv2.erode(fgmask, kernel, iterations=1)
     res = cv2.bitwise_and(frame, frame, mask=fgmask)
     return res
-
-
-run()
