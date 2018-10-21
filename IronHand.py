@@ -7,7 +7,7 @@ import math
 gui.FAILSAFE = False;
 
 # Switches for testing
-click = False
+click = True
 
 # Important globals
 numFing = 0
@@ -98,18 +98,22 @@ def calculateOneZero(res, drawing):  # -> finished bool, cnt: finger count
                 s, e, f, d = defects[i][0]
                 start = tuple(res[s][0])
                 end = tuple(res[e][0])
+                if ((end[0]- calculateHighestPoint(res)[0])**2 + (end[1]- calculateHighestPoint(res)[1])**2)**(1/2) > 50:
+                    continue
                 far = tuple(res[f][0])
                 a = math.sqrt((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2)
+                if a < 50:
+                    continue
                 b = math.sqrt((far[0] - start[0]) ** 2 + (far[1] - start[1]) ** 2)
                 c = math.sqrt((end[0] - far[0]) ** 2 + (end[1] - far[1]) ** 2)
                 angle = math.acos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c))  # cosine theorem
                 # Angle debug
                 # print(angle)
 
-                if 13/18*math.pi > angle >= 4/9*math.pi:  # angle less than 90 degree, treat as fingers
+                if 15/18*math.pi > angle >= 4/9*math.pi:
                     cnt = 1
                     cv2.circle(drawing, start, 5, (0, 0, 255), -1)
-                    cv2.circle(drawing, end, 5, (0, 0, 255), -1)
+                    cv2.circle(drawing, end, 5, (0, 255, 255), -1)
                     cv2.circle(drawing, far, 5, (0, 0, 255), -1)
                     cv2.imshow('angles', drawing)
                     cv2.waitKey(1)
