@@ -5,6 +5,8 @@ import time
 import math
 from threading import Thread
 from audiotranscripter import AudioTranscripter
+import queue
+import winsound
 import pyaudio
 
 gui.FAILSAFE = False;
@@ -15,11 +17,12 @@ click = True
 # Important globals
 initialCalibrate = 0
 bgModel = None
-backgroundVersion = False
-rightHanded = False
+backgroundVersion = True
+rightHanded = True
 bgCaptured = False
 boxX = .5
 boxY = 1
+isRecording = False
 if not rightHanded:
     boxX = .5
 scrollMode = False
@@ -28,9 +31,12 @@ numFing = 0
 pos = tuple([0, 0])
 detect = False
 listenClick = False;
+maxQueueSize = 5
+inputQueue = queue.Queue(maxQueueSize)
+numFours = 0
 timeSinceFive = time.time() - 5
 timeSinceThree = time.time()
-at = AudioTranscripter()
+at = None
 recording = False;
 # constant
 threshold = 20
@@ -42,8 +48,8 @@ sizeThreshold = 8000
 screenWidth = int(960 * 2)
 screenHeight = int(540 * 2)
 if backgroundVersion:
-    screenWidth = int(1920)
-    screenHeight = int(1080)
+    screenWidth = int(720)
+    screenHeight = int(480)
 bound = 4
 xBoundLow = int(screenWidth / bound)
 yBoundLow = int(screenHeight / bound)
@@ -70,7 +76,15 @@ oldX = 0
 oldY = 0
 numStill = 0
 
-
+def set_right(b):
+    global rightHanded
+    rightHanded = b
+def set_background(b):
+    global backgroundVersion
+    backgroundVersion = b
+def set_at(a):
+    global at
+    at = a
 def calculateHighestPoint(maxCont):
     extTop = tuple(maxCont[maxCont[:, :, 1].argmin()][0])
     return extTop
@@ -179,7 +193,7 @@ def run():
 
 
 def loop():
-    global newX, newY, oldX, oldY, listenClick, scrollMode, scrollBaseY, dragging, timeSinceFive, bgModel, bgCaptured, initialCalibrate, at, recording, timeSinceThree
+    global newX, newY, oldX, oldY, listenClick, scrollMode, scrollBaseY, dragging, timeSinceFive, bgModel, bgCaptured, initialCalibrate, at, recording, timeSinceThree, numFours, isRecording
     _, frame = webcam.read()
     if not backgroundVersion:
         # flip image
@@ -257,16 +271,32 @@ def loop():
                 numFing = calculateOneZero(maxCont, frame)
             pos = calculateHighestPoint(maxCont)
             # Check for one finger
-            print(numFing, pos)
+            if inputQueue.qsize() == maxQueueSize:
+                if inputQueue.get() == 4:
+                    numFours -= 1
+            inputQueue.put(numFing)
+            if numFing == 4:
+                numFours += 1
+            if numFours > maxQueueSize - 2 and not isRecording:
+                at.start()
+                isRecording = True
+                winsound.PlaySound('beep-01a.wav',winsound.SND_FILENAME)
+            if numFing == 0 and isRecording:
+                transcript=at.stop()
+                isRecording = False
+                winsound.PlaySound('beep-02.wav',winsound.SND_FILENAME)
+                if transcript is not None:
+                    gui.typewrite(transcript)
+            print(numFing, pos, numFours)
             # Debug
             # print(pos)
             cv2.circle(frame, pos, 5, (0, 0, 255), -1)
             cv2.imshow('Point', frame)
             # Recalibrate
-            # print(cv2.contourArea(maxCont)/screenWidth/screenHeight)
-            if cv2.contourArea(maxCont)/screenWidth/screenHeight > .5 and backgroundVersion and initialCalibrate != 0:
-                bgCaptured = False
-            initialCalibrate = 1
+            # # print(cv2.contourArea(maxCont)/screenWidth/screenHeight)
+            # if cv2.contourArea(maxCont)/screenWidth/screenHeight > .5 and backgroundVersion and initialCalibrate != 0:
+            #     bgCaptured = False
+            # initialCalibrate = 1
         else:
             detect = False
         if detect and numFing == 1:
