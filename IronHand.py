@@ -12,13 +12,15 @@ gui.FAILSAFE = False;
 click = True
 
 # Important globals
-rightHanded = True
+rightHanded = False
 scrollMode = False
 scrollBaseY = 0
 numFing = 0
 pos = tuple([0, 0])
 detect = False
 listenClick = False;
+timeSinceFive = time.time()-5
+dragging = False;
 # constant
 stillTime = 3
 clickHold = .3
@@ -154,7 +156,7 @@ def run():
 
 
 def loop():
-    global newX, newY, oldX, oldY, listenClick, scrollMode, scrollBaseY
+    global newX, newY, oldX, oldY, listenClick, scrollMode, scrollBaseY, dragging, timeSinceFive
     _, frame = webcam.read()
     # flip image
     frame = cv2.flip(frame, 1)
@@ -206,7 +208,7 @@ def loop():
             numFing = calculateOneZero(maxCont, frame)
         pos = calculateHighestPoint(maxCont)
         # Check for one finger
-        #print(numFing)
+        print(numFing)
         # Debug
         # print(pos)
         cv2.circle(frame, pos, 5, (0, 0, 255), -1)
@@ -226,13 +228,36 @@ def loop():
     elif detect and numFing == 2:
         #if not in scroll mode, store the base y and set scroll mode to true
         if not scrollMode:
-            scrollMode = True;
+            scrollMode = True
             scrollBaseY = pos[1]
-            print(scrollBaseY)
         else:
             clicks = int((scrollBaseY-pos[1]))
             gui.scroll(clicks)
-
+    elif detect and numFing == 5:
+        scrollMode = False
+        listenClick = False
+        if dragging:
+            gui.mouseUp()
+            dragging = False
+        else:
+            scaleX = gui.size()[0] / (xBoundHigh - xBoundLow)
+            scaleY = gui.size()[1] / (yBoundHigh - yBoundLow)
+            oldX = newX
+            oldY = newY
+            newX = (pos[0] - xBoundLow) * scaleX
+            newY = (pos[1] - yBoundLow) * scaleY
+            timeSinceFive = time.time()
+    elif detect and numFing == 0:
+        scrollMode = False
+        listenClick = False
+        if dragging:
+            scaleX = gui.size()[0] / (xBoundHigh - xBoundLow)
+            scaleY = gui.size()[1] / (yBoundHigh - yBoundLow)
+            gui.moveTo((pos[0] - xBoundLow) * scaleX, (pos[1] - yBoundLow) * scaleY)
+            time.sleep(0.1)
+        elif time.time() - timeSinceFive < 0.5:
+            dragging = True
+            gui.mouseDown()
     else:
         scrollMode = False
         listenClick = False
