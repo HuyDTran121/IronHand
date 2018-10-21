@@ -254,7 +254,7 @@ def loop():
             scaleX = gui.size()[0] / (xBoundHigh - xBoundLow)
             scaleY = gui.size()[1] / (yBoundHigh - yBoundLow)
             gui.moveTo((pos[0] - xBoundLow) * scaleX, (pos[1] - yBoundLow) * scaleY)
-            time.sleep(0.1)
+            #time.sleep(0.1)
         elif time.time() - timeSinceFive < 0.5:
             dragging = True
             gui.mouseDown()
