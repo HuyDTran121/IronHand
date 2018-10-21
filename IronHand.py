@@ -338,7 +338,7 @@ def loop():
         #     timeSinceThree = time.time()
         #     if not recording:
         #         recording = True
-        #         at.start(
+        #         at.start()
         else:
             scrollMode = False
             listenClick = False
