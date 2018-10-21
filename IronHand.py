@@ -236,20 +236,5 @@ def loop():
     else:
         scrollMode = False
         listenClick = False
-
-        # gui.moveTo(x, y, movementSmooth, gui.easeInQuad)
-    #     if abs(x-prevx) < 10 and y-prevy < 10:
-    #         if time.time() > clickTimer+0.5:
-    #             gui.click(x, y)
-    #             clickTimer +=1
-    #     else:
-    #         prevx = x
-    #         prevy = y
-    #         clickTimer = time.time()
-    # else:
-    #     clickTimer = time.time()
-
-
-# async def wrapperMove():
 run()
 
