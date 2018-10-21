@@ -12,6 +12,11 @@ gui.FAILSAFE = False;
 click = True
 
 # Important globals
+bgModel = None
+backgroundVersion = False
+bgCaptured = False
+boxX = .5
+boxY = .8
 rightHanded = False
 scrollMode = False
 scrollBaseY = 0
@@ -22,6 +27,8 @@ listenClick = False;
 timeSinceFive = time.time()-5
 dragging = False;
 # constant
+threshold = 60
+bgThreshold = 50
 stillTime = 3
 clickHold = .3
 mouseSensitivity = 60
@@ -39,9 +46,6 @@ movementSmooth = 0.1
 # prior bounds
 lowerBound = np.array([80, 50, 50])  # before 60,100,100
 upperBound = np.array([120, 255, 255])  # before 180, 255, 255
-# new bounds
-# lowerBound = np.array([200, 7, 209])
-# upperBound = np.array([230, 21, 235])
 blurValue = 41
 font = cv2.FONT_HERSHEY_SIMPLEX
 webcam = cv2.VideoCapture(0)
@@ -128,7 +132,7 @@ def calculateFingers(res, drawing):  # -> finished bool, cnt: finger count
 
 
 def run():
-    global numStill, clickTimer, listenClick
+    global numStill, clickTimer, listenClick, bgCaptured, bgModel
     while (webcam.isOpened()):
         moveThread = Thread(target=gui.moveTo, args=(newX, newY, movementSmooth))
         if -mouseSensitivity < newX - oldX < mouseSensitivity and -mouseSensitivity < newY - oldY < mouseSensitivity:
@@ -150,116 +154,156 @@ def run():
             loop()
             moveThread.join()
         # print(newX-oldX, newY-oldY)
-        k = cv2.waitKey(1)
+        # Checking for keyboard inputs
+        k = cv2.waitKey(1) #TODO May cause lag
         if k == 27:  # press ESC to exit
             break
+        elif k == ord('b'):  # press 'b' to capture the background
+            bgModel = cv2.createBackgroundSubtractorMOG2(0, bgThreshold)
+            bgCaptured = True
+            # print(bgCaptured)
+            print('!!!Background Captured!!!')
+        elif k == ord('r'):  # press 'r' to reset the background
+            bgModel = None
+            triggerSwitch = False
+            bgCaptured = False
+            print('!!!Reset BackGround!!!')
 
-#test
+
 def loop():
-    global newX, newY, oldX, oldY, listenClick, scrollMode, scrollBaseY, dragging, timeSinceFive
+    global newX, newY, oldX, oldY, listenClick, scrollMode, scrollBaseY, dragging, timeSinceFive, bgModel
     _, frame = webcam.read()
-    # flip image
-    frame = cv2.flip(frame, 1)
-    frame = cv2.resize(frame, (screenWidth, screenHeight))
-    img = cv2.GaussianBlur(frame, (blurValue, blurValue), 0)
-    imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    # show frame
-    # cv2.imshow('Blur', imgHSV)
-    mask = cv2.inRange(imgHSV, lowerBound, upperBound)
-    maskOpen = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernelOpen)
-    maskClose = cv2.morphologyEx(maskOpen, cv2.MORPH_CLOSE, kernelOpen)
-    # show frame
-    cv2.imshow('maskClose', maskClose)
-    # show frame
-    cv2.imshow('mask', mask)
-    _, conts, _ = cv2.findContours(maskOpen.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    maxx, maxy, maxh, maxw = [0, 0, 0, 0];
-    ci = 0
-    for i in range(len(conts)):
-        x, y, w, h = cv2.boundingRect(conts[i])
-        if h * w > maxh * maxw:
-            maxx = x;
-            maxy = y;
-            maxw = w;
-            maxh = h;
-            ci = i
-    # Area debug
-    # print(maxw * maxh)
-    # If worthy size
-    if maxw * maxh > sizeThreshold:
-        # w, h = gui.size()
-        # wr, hr = w / (xBoundHigh - xBoundLow), h / (yBoundHigh - yBoundLow)
-        # x1 = maxx + maxw / 2
-        # y1 = maxy + maxh / 2
-        # x = int(w - (x1 - xBoundLow) * wr)
-        # y = int((y1 - yBoundLow) * hr)
-        detect = True
-
-        # Finger processing
-        maxCont = conts[ci]
-        hull = cv2.convexHull(maxCont)
-        drawing = np.zeros(img.shape, np.uint8)
-        cv2.drawContours(drawing, [maxCont], 0, (0, 255, 0), 2)
-        cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
-
-        isFinishCal, cnt = calculateFingers(maxCont, drawing)
-        numFing = cnt + 1
-        if numFing == 1:
-            numFing = calculateOneZero(maxCont, frame)
-        pos = calculateHighestPoint(maxCont)
-        # Check for one finger
-        print(numFing)
-        # Debug
-        # print(pos)
-        cv2.circle(frame, pos, 5, (0, 0, 255), -1)
-        cv2.imshow('Point', frame)
+    if not backgroundVersion:
+        # flip image
+        frame = cv2.flip(frame, 1)
+        frame = cv2.resize(frame, (screenWidth, screenHeight))
+        img = cv2.GaussianBlur(frame, (blurValue, blurValue), 0)
+        imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        # show frame
+        # cv2.imshow('Blur', imgHSV)
+        mask = cv2.inRange(imgHSV, lowerBound, upperBound)
+        maskOpen = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernelOpen)
+        maskClose = cv2.morphologyEx(maskOpen, cv2.MORPH_CLOSE, kernelOpen)
+        # show frame
+        cv2.imshow('maskClose', maskClose)
+        # show frame
+        cv2.imshow('mask', mask)
+    else: #TODO Working here
+        frame = cv2.bilateralFilter(frame, 5, 50, 100)  # use smoothing filter
+        frame = cv2.flip(frame, 1)
+        cv2.rectangle(frame, (int(boxX * frame.shape[1]), 0),
+                      (frame.shape[1], int(boxY * frame.shape[0])), (255, 0, 0), 2)
+        cv2.imshow('original', frame)
         cv2.waitKey(1)
-    else:
-        detect = False
-    if detect and numFing == 1:
-        scaleX = gui.size()[0] / (xBoundHigh - xBoundLow)
-        scaleY = gui.size()[1] / (yBoundHigh - yBoundLow)
-        oldX = newX
-        oldY = newY
-        newX = (pos[0] - xBoundLow) * scaleX
-        newY = (pos[1] - yBoundLow) * scaleY
-        listenClick = True
-        scrollMode = False
-    elif detect and numFing == 2:
-        #if not in scroll mode, store the base y and set scroll mode to true
-        if not scrollMode:
-            scrollMode = True
-            scrollBaseY = pos[1]
+        # print(bgCaptured)
+        if bgCaptured:
+            print('bg is captured')
+            img = removeBG(frame)
+            img = img[0:int(boxY * frame.shape[0]),
+                  int(boxX * frame.shape[1]):frame.shape[1]]  # clip the ROI
+            cv2.imshow('mask', img)
+            # Binarize
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            blur = cv2.GaussianBlur(gray, (blurValue, blurValue), 0)
+            cv2.imshow('blur', blur)
+            ret, thresh = cv2.threshold(blur, threshold, 255, cv2.THRESH_BINARY)
+            cv2.imshow('ori', thresh)
+            maskOpen = thresh
+        #TODO End of BG version
+    if not backgroundVersion or (backgroundVersion and bgCaptured):
+        print('made it')
+        _, conts, _ = cv2.findContours(maskOpen.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        maxx, maxy, maxh, maxw = [0, 0, 0, 0];
+        ci = 0
+        for i in range(len(conts)):
+            x, y, w, h = cv2.boundingRect(conts[i])
+            if h * w > maxh * maxw:
+                maxx = x;
+                maxy = y;
+                maxw = w;
+                maxh = h;
+                ci = i
+        # Area debug
+        # print(maxw * maxh)
+        # If worthy size
+        if maxw * maxh > sizeThreshold:
+            detect = True
+
+            # Finger processing
+            maxCont = conts[ci]
+            hull = cv2.convexHull(maxCont)
+            drawing = np.zeros(img.shape, np.uint8)
+            cv2.drawContours(drawing, [maxCont], 0, (0, 255, 0), 2)
+            cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
+            cv2.imshow("test", drawing)
+
+            isFinishCal, cnt = calculateFingers(maxCont, drawing)
+            numFing = cnt + 1
+            if numFing == 1:
+                numFing = calculateOneZero(maxCont, frame)
+            pos = calculateHighestPoint(maxCont)
+            # Check for one finger
+            print(numFing)
+            # Debug
+            # print(pos)
+            cv2.circle(frame, pos, 5, (0, 0, 255), -1)
+            cv2.imshow('Point', frame)
+            cv2.waitKey(1)
         else:
-            clicks = int((scrollBaseY-pos[1]))
-            gui.scroll(clicks)
-    elif detect and numFing == 5:
-        scrollMode = False
-        listenClick = False
-        if dragging:
-            gui.mouseUp()
-            dragging = False
-        else:
+            detect = False
+        if detect and numFing == 1:
             scaleX = gui.size()[0] / (xBoundHigh - xBoundLow)
             scaleY = gui.size()[1] / (yBoundHigh - yBoundLow)
             oldX = newX
             oldY = newY
             newX = (pos[0] - xBoundLow) * scaleX
             newY = (pos[1] - yBoundLow) * scaleY
-            timeSinceFive = time.time()
-    elif detect and numFing == 0:
-        scrollMode = False
-        listenClick = False
-        if dragging:
-            scaleX = gui.size()[0] / (xBoundHigh - xBoundLow)
-            scaleY = gui.size()[1] / (yBoundHigh - yBoundLow)
-            gui.moveTo((pos[0] - xBoundLow) * scaleX, (pos[1] - yBoundLow) * scaleY)
-            #time.sleep(0.1)
-        elif time.time() - timeSinceFive < 0.5:
-            dragging = True
-            gui.mouseDown()
-    else:
-        scrollMode = False
-        listenClick = False
+            listenClick = True
+            scrollMode = False
+        elif detect and numFing == 2:
+            #if not in scroll mode, store the base y and set scroll mode to true
+            if not scrollMode:
+                scrollMode = True
+                scrollBaseY = pos[1]
+            else:
+                clicks = int((scrollBaseY-pos[1]))
+                gui.scroll(clicks)
+        elif detect and numFing == 5:
+            scrollMode = False
+            listenClick = False
+            if dragging:
+                gui.mouseUp()
+                dragging = False
+            else:
+                scaleX = gui.size()[0] / (xBoundHigh - xBoundLow)
+                scaleY = gui.size()[1] / (yBoundHigh - yBoundLow)
+                oldX = newX
+                oldY = newY
+                newX = (pos[0] - xBoundLow) * scaleX
+                newY = (pos[1] - yBoundLow) * scaleY
+                timeSinceFive = time.time()
+        elif detect and numFing == 0:
+            scrollMode = False
+            listenClick = False
+            if dragging:
+                scaleX = gui.size()[0] / (xBoundHigh - xBoundLow)
+                scaleY = gui.size()[1] / (yBoundHigh - yBoundLow)
+                gui.moveTo((pos[0] - xBoundLow) * scaleX, (pos[1] - yBoundLow) * scaleY)
+                #time.sleep(0.1)
+            elif time.time() - timeSinceFive < 0.5:
+                dragging = True
+                gui.mouseDown()
+        else:
+            scrollMode = False
+            listenClick = False
+
+
+def removeBG(frame):
+    fgmask = bgModel.apply(frame, learningRate=0)
+    kernel = np.ones((3, 3), np.uint8)
+    fgmask = cv2.erode(fgmask, kernel, iterations=1)
+    res = cv2.bitwise_and(frame, frame, mask=fgmask)
+    return res
+
 run()
 
