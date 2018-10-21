@@ -15,13 +15,13 @@ click = True
 # Important globals
 initialCalibrate = 0
 bgModel = None
-backgroundVersion = True
-rightHanded = True
+backgroundVersion = False
+rightHanded = False
 bgCaptured = False
-boxX = .4
+boxX = .5
 boxY = 1
 if not rightHanded:
-    boxX = .6
+    boxX = .5
 scrollMode = False
 scrollBaseY = 0
 numFing = 0
@@ -42,8 +42,8 @@ sizeThreshold = 8000
 screenWidth = int(960 * 2)
 screenHeight = int(540 * 2)
 if backgroundVersion:
-    screenWidth = int(960)
-    screenHeight = int(540)
+    screenWidth = int(1920)
+    screenHeight = int(1080)
 bound = 4
 xBoundLow = int(screenWidth / bound)
 yBoundLow = int(screenHeight / bound)
@@ -51,7 +51,7 @@ xBoundHigh = int((bound - 1) * screenWidth / bound)
 yBoundHigh = int((bound - 1) * .85
                  * screenHeight / bound)
 # movementSmooth < 1
-movementSmooth = 0.1
+movementSmooth = 0.0
 # prior bounds
 lowerBound = np.array([80, 50, 50])  # before 60,100,100
 upperBound = np.array([120, 255, 255])  # before 180, 255, 255
@@ -172,6 +172,10 @@ def run():
         elif k == ord('b') and backgroundVersion:  # press 'b' to capture the background
             bgModel = cv2.createBackgroundSubtractorMOG2(0, bgThreshold)
             bgCaptured = True
+        elif k == ord('r'):  # press 'r' to reset the background
+            bgModel = None
+            triggerSwitch = False
+            isBgCaptured = 0
 
 
 def loop():
@@ -282,7 +286,7 @@ def loop():
             else:
                 clicks = int((scrollBaseY - pos[1]))
                 gui.scroll(clicks)
-        elif detect and numFing == 5:
+        elif detect and numFing >= 5:
             scrollMode = False
             listenClick = False
             timeSinceFive = time.time()
@@ -295,6 +299,7 @@ def loop():
             #     if transcript is not None:
             #         gui.typewrite(transcript)
             if time.time() - timeSinceFive < 0.5:
+                gui.keyDown('ctrl')
                 gui.press('w')
                 gui.keyUp('ctrl')
         # elif detect and numFing == 4:
