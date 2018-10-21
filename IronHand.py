@@ -4,21 +4,22 @@ import pyautogui as gui
 import time
 import math
 from threading import Thread
+from audiotranscripter import AudioTranscripter
 import pyaudio
 
 gui.FAILSAFE = False;
 
 # Switches for testing
-click = False
+click = True
 
 # Important globals
 initialCalibrate = 0
 bgModel = None
 backgroundVersion = True
-bgCaptured = False
 rightHanded = True
+bgCaptured = False
 boxX = .4
-boxY = .9
+boxY = 1
 if not rightHanded:
     boxX = .6
 scrollMode = False
@@ -28,7 +29,9 @@ pos = tuple([0, 0])
 detect = False
 listenClick = False;
 timeSinceFive = time.time() - 5
-dragging = False;
+timeSinceThree = time.time()
+at = AudioTranscripter()
+recording = False;
 # constant
 threshold = 20
 bgThreshold = 50
@@ -172,7 +175,7 @@ def run():
 
 
 def loop():
-    global newX, newY, oldX, oldY, listenClick, scrollMode, scrollBaseY, dragging, timeSinceFive, bgModel, bgCaptured, initialCalibrate
+    global newX, newY, oldX, oldY, listenClick, scrollMode, scrollBaseY, dragging, timeSinceFive, bgModel, bgCaptured, initialCalibrate, at, recording, timeSinceThree
     _, frame = webcam.read()
     if not backgroundVersion:
         # flip image
@@ -250,13 +253,13 @@ def loop():
                 numFing = calculateOneZero(maxCont, frame)
             pos = calculateHighestPoint(maxCont)
             # Check for one finger
-            #print(numFing, pos)
+            print(numFing, pos)
             # Debug
             # print(pos)
             cv2.circle(frame, pos, 5, (0, 0, 255), -1)
             cv2.imshow('Point', frame)
             # Recalibrate
-            print(cv2.contourArea(maxCont)/screenWidth/screenHeight)
+            # print(cv2.contourArea(maxCont)/screenWidth/screenHeight)
             if cv2.contourArea(maxCont)/screenWidth/screenHeight > .5 and backgroundVersion and initialCalibrate != 0:
                 bgCaptured = False
             initialCalibrate = 1
@@ -282,28 +285,25 @@ def loop():
         elif detect and numFing == 5:
             scrollMode = False
             listenClick = False
-            if dragging:
-                gui.mouseUp()
-                dragging = False
-            else:
-                scaleX = gui.size()[0] / (xBoundHigh - xBoundLow)
-                scaleY = gui.size()[1] / (yBoundHigh - yBoundLow)
-                oldX = newX
-                oldY = newY
-                newX = (pos[0] - xBoundLow) * scaleX
-                newY = (pos[1] - yBoundLow) * scaleY
-                timeSinceFive = time.time()
+            timeSinceFive = time.time()
         elif detect and numFing == 0:
             scrollMode = False
             listenClick = False
-            if dragging:
-                scaleX = gui.size()[0] / (xBoundHigh - xBoundLow)
-                scaleY = gui.size()[1] / (yBoundHigh - yBoundLow)
-                gui.moveTo((pos[0] - xBoundLow) * scaleX, (pos[1] - yBoundLow) * scaleY)
-                # time.sleep(0.1)
-            elif time.time() - timeSinceFive < 0.5:
-                dragging = True
-                gui.mouseDown()
+            # if recording and time.time()-timeSinceThree > 0.5:
+            #     recording = False
+            #     transcript = at.stop()
+            #     if transcript is not None:
+            #         gui.typewrite(transcript)
+            if time.time() - timeSinceFive < 0.5:
+                gui.press('w')
+                gui.keyUp('ctrl')
+        # elif detect and numFing == 4:
+        #     scrollMode = False
+        #     listenClick = False
+        #     timeSinceThree = time.time()
+        #     if not recording:
+        #         recording = True
+        #         at.start()
         else:
             scrollMode = False
             listenClick = False
